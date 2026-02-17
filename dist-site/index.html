@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TikTok Live Tap Counter - Official Download</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #0f172a;
+            color: #e2e8f0;
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        h1 {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            background: linear-gradient(to right, #ff0050, #00f2ea);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .subtitle {
+            font-size: 1.2rem;
+            color: #94a3b8;
+        }
+
+        .download-section {
+            background: #1e293b;
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+            margin-bottom: 60px;
+        }
+
+        .btn {
+            display: inline-block;
+            background: linear-gradient(135deg, #ff0050 0%, #d60043 100%);
+            color: white;
+            padding: 15px 40px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            text-decoration: none;
+            border-radius: 50px;
+            transition: all 0.3s ease;
+            margin-top: 20px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px -10px rgba(255, 0, 80, 0.5);
+        }
+
+        .guide-section {
+            background: #1e293b;
+            padding: 40px;
+            border-radius: 20px;
+            margin-bottom: 40px;
+        }
+
+        h2 {
+            border-bottom: 2px solid #334155;
+            padding-bottom: 15px;
+            margin-bottom: 30px;
+            color: #f8fafc;
+        }
+
+        .step {
+            margin-bottom: 30px;
+        }
+
+        .step-title {
+            font-weight: bold;
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+            color: #38bdf8;
+        }
+
+        code {
+            background: #0f172a;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Consolas', monospace;
+            color: #ff0050;
+        }
+
+        footer {
+            text-align: center;
+            color: #64748b;
+            margin-top: 80px;
+            font-size: 0.9rem;
+        }
+
+        .version-badge {
+            background: #334155;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>TikTok Live Tap Counter</h1>
+            <div class="subtitle">Real-time engagement tracking for streamers</div>
+            <p>Version <span id="latest-version" class="version-badge">Loading...</span></p>
+        </header>
+
+        <div class="download-section">
+            <h2>Download Latest Version</h2>
+            <p>Ready to boost your stream engagement? Get the tool now.</p>
+            <a href="https://github.com/cooowabungaaa-hue/tiktok-tap-counter/releases/latest/download/tiktok-live-tap-counter.zip"
+                class="btn">Download for Windows</a>
+            <p style="margin-top: 20px; font-size: 0.9rem; color: #94a3b8;">
+                * Download includes the application and automatic updater.
+            </p>
+        </div>
+
+        <div class="guide-section">
+            <h2>Setup Guide 🚀</h2>
+
+            <div class="step">
+                <div class="step-title">1. Download & Extract</div>
+                <p>Click the download button above to get the zip file. Extract (unzip) the contents to a folder on your
+                    computer (e.g., Desktop or Documents).</p>
+            </div>
+
+            <div class="step">
+                <div class="step-title">2. Run the Application</div>
+                <p>Double-click <code>TikTokTapCounter.exe</code> inside the extracted folder. A black window (console)
+                    will open - keep this open!</p>
+            </div>
+
+            <div class="step">
+                <div class="step-title">3. Connect to Stream</div>
+                <p>Your browser should automatically open to the dashboard. If not, go to
+                    <code>http://localhost:8000</code>.</p>
+                <p>Enter your TikTok username (the @handle) and click <strong>Connect</strong>.</p>
+            </div>
+
+            <div class="step">
+                <div class="step-title">4. Updates</div>
+                <p>When a new version is released, you'll see a notification in the app. Just click
+                    <strong>Update</strong> and let the tool handle the rest!</p>
+            </div>
+        </div>
+
+        <div class="guide-section">
+            <h2>Troubleshooting</h2>
+            <ul>
+                <li><strong>"Windows protected your PC" popup?</strong><br> Click "More info" -> "Run anyway". This
+                    happens because the app isn't signed with a costly certificate yet.</li>
+                <li><strong>Port 8000 error?</strong><br> Make sure no other version of the tool is running. Check Task
+                    Manager to close old processes.</li>
+            </ul>
+        </div>
+
+        <footer>
+            &copy; 2026 Engagement Tools. Not affiliated with TikTok.
+        </footer>
+    </div>
+
+    <script>
+        // Fetch latest version from version.json
+        fetch('./version.json')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('latest-version').textContent = 'v' + data.version;
+            })
+            .catch(err => {
+                document.getElementById('latest-version').textContent = 'v1.0.0';
+                console.error('Failed to fetch version', err);
+            });
+    </script>
+</body>
+
+</html>

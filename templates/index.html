@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TikTok Live Tap Counter</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Outfit:wght@400;700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --primary: #38bdf8;
+            --secondary: #818cf8;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #f43f5e;
+            --success: #10b981;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem;
+            background-image:
+                radial-gradient(at 0% 0%, hsla(215, 98%, 61%, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, hsla(339, 49%, 30%, 0.15) 0px, transparent 50%);
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 2.5rem;
+            font-weight: 800;
+            background: linear-gradient(to right, var(--primary), var(--secondary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 1rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 1.5rem;
+            padding: 2rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            margin-bottom: 2rem;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        input {
+            flex: 1;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 0.75rem;
+            padding: 0.75rem 1rem;
+            color: white;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input:focus {
+            border-color: var(--primary);
+        }
+
+        button {
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.75rem;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(to right, #0ea5e9, #6366f1);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        .btn-danger {
+            background: var(--accent);
+            color: white;
+        }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #475569;
+        }
+
+        .dot.active {
+            background: var(--success);
+            box-shadow: 0 0 10px var(--success);
+        }
+
+        .leaderboard {
+            list-style: none;
+        }
+
+        .leaderboard-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            transition: background 0.2s;
+        }
+
+        .leaderboard-item:last-child {
+            border-bottom: none;
+        }
+
+        .user-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .nickname {
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .user-id {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .tap-count {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .animation-pop {
+            animation: pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes pop {
+            0% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.1);
+                color: var(--accent);
+            }
+
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        .empty-state {
+            text-align: center;
+            color: var(--text-muted);
+            padding: 2rem;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>TikTok Live Tap Counter</h1>
+            <p class="subtitle">Real-time user tap monitoring system (v{{ version }})</p>
+        </header>
+
+        <div id="updateBanner" class="card"
+            style="display:none; border: 1px solid var(--secondary); background: rgba(99, 102, 241, 0.1);">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span>🚀 新しいバージョンが見つかりました！</span>
+                <a id="updateLink" href="#" target="_blank" class="btn-primary"
+                    style="text-decoration: none; font-size: 0.8rem;">ダウンロード</a>
+            </div>
+        </div>
+
+        <section class="card">
+            <div class="input-group">
+                <input type="text" id="streamerId" placeholder="@username" value="">
+                <button id="connectBtn" class="btn-primary">Connect</button>
+                <button id="disconnectBtn" class="btn-danger" style="display:none;">Disconnect</button>
+            </div>
+            <div class="status-badge">
+                <span id="statusDot" class="dot"></span>
+                <span id="statusText">Disconnected</span>
+            </div>
+        </section>
+
+        <section class="card">
+            <h2 style="margin-bottom: 1.5rem; font-family: 'Outfit', sans-serif;">Live Leaderboard</h2>
+            <ul id="leaderboard" class="leaderboard">
+                <div class="empty-state">No data yet. Connect to a stream to start counting!</div>
+            </ul>
+        </section>
+    </div>
+
+    <script>
+        const socket = io();
+        const streamerIdInput = document.getElementById('streamerId');
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const leaderboard = document.getElementById('leaderboard');
+
+        let userTable = {};
+
+        connectBtn.addEventListener('click', () => {
+            const id = streamerIdInput.value.trim();
+            if (id) {
+                socket.emit('connect_streamer', { unique_id: id });
+                connectBtn.disabled = true;
+                connectBtn.innerText = 'Connecting...';
+            }
+        });
+
+        disconnectBtn.addEventListener('click', () => {
+            socket.emit('disconnect_streamer');
+        });
+
+        socket.on('update_available', (data) => {
+            const banner = document.getElementById('updateBanner');
+            const link = document.getElementById('updateLink');
+            banner.style.display = 'block';
+            if (data.url) link.href = data.url;
+        });
+
+        socket.on('status', (data) => {
+            if (data.connected) {
+                statusDot.classList.add('active');
+                statusText.innerText = `Connected to ${data.streamer}`;
+                connectBtn.style.display = 'none';
+                disconnectBtn.style.display = 'inline-block';
+            } else {
+                statusDot.classList.remove('active');
+                statusText.innerText = 'Disconnected';
+                connectBtn.style.display = 'inline-block';
+                disconnectBtn.style.display = 'none';
+                connectBtn.disabled = false;
+                connectBtn.innerText = 'Connect';
+            }
+        });
+
+        socket.on('tap_update', (data) => {
+            const { user_id, nickname, total_count } = data;
+
+            if (leaderboard.querySelector('.empty-state')) {
+                leaderboard.innerHTML = '';
+            }
+
+            let item = document.getElementById(`user-${user_id}`);
+            if (!item) {
+                item = document.createElement('li');
+                item.id = `user-${user_id}`;
+                item.className = 'leaderboard-item';
+                item.innerHTML = `
+                    <div class="user-info">
+                        <span class="nickname">${nickname}</span>
+                        <span class="user-id">ID: ${user_id}</span>
+                    </div>
+                    <div class="tap-count">0</div>
+                `;
+                leaderboard.appendChild(item);
+            }
+
+            const countEl = item.querySelector('.tap-count');
+            countEl.innerText = total_count.toLocaleString();
+
+            // Re-order leaderboard
+            sortLeaderboard();
+
+            // Minimal animation
+            countEl.classList.remove('animation-pop');
+            void countEl.offsetWidth; // trigger reflow
+            countEl.classList.add('animation-pop');
+        });
+
+        socket.on('error', (data) => {
+            alert(`Error: ${data.message}`);
+            connectBtn.disabled = false;
+            connectBtn.innerText = 'Connect';
+        });
+
+        function sortLeaderboard() {
+            const items = Array.from(leaderboard.children);
+            items.sort((a, b) => {
+                const countA = parseInt(a.querySelector('.tap-count').innerText.replace(/,/g, ''));
+                const countB = parseInt(b.querySelector('.tap-count').innerText.replace(/,/g, ''));
+                return countB - countA;
+            });
+            items.forEach(item => leaderboard.appendChild(item));
+        }
+    </script>
+</body>
+
+</html>
