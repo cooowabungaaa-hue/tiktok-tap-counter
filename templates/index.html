@@ -206,12 +206,58 @@
             color: var(--text-muted);
             padding: 2rem;
         }
+
+        .avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin-right: 1rem;
+            object-fit: cover;
+            border: 2px solid var(--primary);
+        }
+
+        .rank {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.2rem;
+            font-weight: 800;
+            width: 30px;
+            color: var(--text-muted);
+            margin-right: 0.5rem;
+        }
+
+        .rank-1 {
+            color: #fbbf24;
+            text-shadow: 0 0 10px rgba(251, 191, 36, 0.5);
+            font-size: 1.5rem;
+        }
+
+        .rank-2 {
+            color: #94a3b8;
+            font-size: 1.4rem;
+        }
+
+        .rank-3 {
+            color: #b45309;
+            font-size: 1.3rem;
+        }
+
+        .controls {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+            justify-content: flex-end;
+        }
     </style>
 </head>
 
 <body>
     <div class="container">
         <header>
+            <div style="position: absolute; top: 1rem; right: 1rem;">
+                <button id="quitBtn" class="btn-danger"
+                    style="padding: 0.5rem 1rem; font-size: 0.8rem; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);">✕
+                    Quit App</button>
+            </div>
             <h1>TikTok Live Tap Counter</h1>
             <p class="subtitle">Real-time user tap monitoring system (v{{ version }})</p>
         </header>
@@ -225,20 +271,37 @@
             </div>
         </div>
 
-        <section class="card">
+        <!-- Setup Panel -->
+        <section id="setupPanel" class="card">
+            <h2 style="margin-bottom: 1rem; font-family: 'Outfit', sans-serif;">Setup Stream</h2>
             <div class="input-group">
-                <input type="text" id="streamerId" placeholder="@username" value="">
-                <button id="connectBtn" class="btn-primary">Connect</button>
-                <button id="disconnectBtn" class="btn-danger" style="display:none;">Disconnect</button>
+                <input type="text" id="streamerId" placeholder="Enter TikTok Username (e.g. @user)" value="">
+                <button id="connectBtn" class="btn-primary">Start Tracking</button>
             </div>
-            <div class="status-badge">
-                <span id="statusDot" class="dot"></span>
-                <span id="statusText">Disconnected</span>
+            <p style="font-size: 0.9rem; color: var(--text-muted);">Enter the streamer's unique ID to begin monitoring
+                taps.</p>
+        </section>
+
+        <!-- Live Panel -->
+        <section id="livePanel" class="card" style="display: none; border-color: var(--success);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <div class="status-badge active" style="background: rgba(16, 185, 129, 0.2);">
+                    <span class="dot active"></span>
+                    <span id="statusText" style="color: var(--success); font-weight: bold;">Connected</span>
+                </div>
+                <button id="disconnectBtn" class="btn-danger">End Session</button>
             </div>
+            <div style="font-size: 1.2rem; font-weight: bold; margin-bottom: 0.5rem;" id="currentStreamerName"></div>
         </section>
 
         <section class="card">
             <h2 style="margin-bottom: 1.5rem; font-family: 'Outfit', sans-serif;">Live Leaderboard</h2>
+            <div class="controls">
+                <button id="copyBtn" class="btn-primary" style="background: var(--secondary); font-size: 0.9rem;">Copy
+                    to Clipboard</button>
+                <button id="csvBtn" class="btn-primary" style="background: var(--success); font-size: 0.9rem;">Download
+                    CSV</button>
+            </div>
             <ul id="leaderboard" class="leaderboard">
                 <div class="empty-state">No data yet. Connect to a stream to start counting!</div>
             </ul>
@@ -249,15 +312,19 @@
         const socket = io();
         const streamerIdInput = document.getElementById('streamerId');
         const connectBtn = document.getElementById('connectBtn');
+        const copyBtn = document.getElementById('copyBtn');
+        const quitBtn = document.getElementById('quitBtn');
         const disconnectBtn = document.getElementById('disconnectBtn');
-        const statusDot = document.getElementById('statusDot');
+        const setupPanel = document.getElementById('setupPanel');
+        const livePanel = document.getElementById('livePanel');
+        const currentStreamerName = document.getElementById('currentStreamerName');
+        // Old elements mapping
         const statusText = document.getElementById('statusText');
-        const leaderboard = document.getElementById('leaderboard');
 
         let userTable = {};
 
         connectBtn.addEventListener('click', () => {
-            const id = streamerIdInput.value.trim();
+            const id = streamerIdInput.value.trim().replace('@', ''); // Auto remove @
             if (id) {
                 socket.emit('connect_streamer', { unique_id: id });
                 connectBtn.disabled = true;
@@ -269,6 +336,46 @@
             socket.emit('disconnect_streamer');
         });
 
+        csvBtn.addEventListener('click', () => {
+            window.location.href = '/export_csv';
+        });
+
+        copyBtn.addEventListener('click', () => {
+            const items = Array.from(leaderboard.querySelectorAll('.leaderboard-item'));
+            if (items.length === 0) return;
+
+            let text = "Rank\tUser\tCount\n";
+            items.forEach((item, index) => {
+                const name = item.querySelector('.nickname').innerText;
+                const count = item.querySelector('.tap-count').innerText;
+                text += `${index + 1}\t${name}\t${count}\n`;
+            });
+
+            navigator.clipboard.writeText(text).then(() => {
+                const originalText = copyBtn.innerText;
+                copyBtn.innerText = 'Copied!';
+                setTimeout(() => copyBtn.innerText = originalText, 2000);
+            }).catch(err => {
+                console.error('Failed to copy: ', err);
+            });
+        });
+
+        quitBtn.addEventListener('click', async () => {
+            if (confirm('Are you sure you want to close the application?')) {
+                try {
+                    await fetch('/shutdown', { method: 'POST' });
+                    document.body.innerHTML = `
+                        <div style="display:flex; justify-content:center; align-items:center; height:100vh; flex-direction:column; text-align:center;">
+                            <h1 style="color:var(--text-main);">App Closed</h1>
+                            <p style="color:var(--text-muted);">You can safely close this tab now.</p>
+                        </div>
+                    `;
+                } catch (e) {
+                    alert('Error shutting down: ' + e);
+                }
+            }
+        });
+
         socket.on('update_available', (data) => {
             const banner = document.getElementById('updateBanner');
             const link = document.getElementById('updateLink');
@@ -278,52 +385,63 @@
 
         socket.on('status', (data) => {
             if (data.connected) {
-                statusDot.classList.add('active');
-                statusText.innerText = `Connected to ${data.streamer}`;
-                connectBtn.style.display = 'none';
-                disconnectBtn.style.display = 'inline-block';
-            } else {
-                statusDot.classList.remove('active');
-                statusText.innerText = 'Disconnected';
-                connectBtn.style.display = 'inline-block';
-                disconnectBtn.style.display = 'none';
+                // Show Live Panel
+                setupPanel.style.display = 'none';
+                livePanel.style.display = 'block';
+
+                statusText.innerText = 'LIVE TRACKING';
+                currentStreamerName.innerText = `Connected to: @${data.streamer}`;
+
+                // Reset setup button just in case
                 connectBtn.disabled = false;
-                connectBtn.innerText = 'Connect';
+                connectBtn.innerText = 'Start Tracking';
+            } else {
+                // Show Setup Panel
+                setupPanel.style.display = 'block';
+                livePanel.style.display = 'none';
+
+                connectBtn.disabled = false;
+                connectBtn.innerText = 'Start Tracking';
+
+                // Clear leaderboard on disconnect
+                leaderboard.innerHTML = '<div class="empty-state">No data yet. Connect to a stream to start counting!</div>';
+            }
+        });
+
+        socket.on('initial_data', (data) => {
+            // Rehydrate leaderboard
+            if (Object.keys(data).length > 0) {
+                leaderboard.innerHTML = ''; // Clear empty state
+                // Convert to array
+                const items = Object.entries(data).map(([uid, val]) => ({
+                    user_id: uid,
+                    ...val
+                }));
+
+                // Sort
+                items.sort((a, b) => b.count - a.count);
+
+                // Render
+                items.forEach(user => {
+                    updateOrAddUser(user.user_id, user.nickname, user.count, user.avatar);
+                });
+
+                updateRanks();
             }
         });
 
         socket.on('tap_update', (data) => {
-            const { user_id, nickname, total_count } = data;
+            const { user_id, nickname, total_count, avatar } = data;
 
             if (leaderboard.querySelector('.empty-state')) {
                 leaderboard.innerHTML = '';
             }
 
-            let item = document.getElementById(`user-${user_id}`);
-            if (!item) {
-                item = document.createElement('li');
-                item.id = `user-${user_id}`;
-                item.className = 'leaderboard-item';
-                item.innerHTML = `
-                    <div class="user-info">
-                        <span class="nickname">${nickname}</span>
-                        <span class="user-id">ID: ${user_id}</span>
-                    </div>
-                    <div class="tap-count">0</div>
-                `;
-                leaderboard.appendChild(item);
-            }
-
-            const countEl = item.querySelector('.tap-count');
-            countEl.innerText = total_count.toLocaleString();
+            updateOrAddUser(user_id, nickname, total_count, avatar);
 
             // Re-order leaderboard
             sortLeaderboard();
-
-            // Minimal animation
-            countEl.classList.remove('animation-pop');
-            void countEl.offsetWidth; // trigger reflow
-            countEl.classList.add('animation-pop');
+            updateRanks();
         });
 
         socket.on('error', (data) => {
@@ -331,6 +449,46 @@
             connectBtn.disabled = false;
             connectBtn.innerText = 'Connect';
         });
+
+        function updateOrAddUser(user_id, nickname, count, avatarUrl) {
+            let item = document.getElementById(`user-${user_id}`);
+            if (!item) {
+                item = document.createElement('li');
+                item.id = `user-${user_id}`;
+                item.className = 'leaderboard-item';
+
+                // Default avatar placeholder (Base64 SVG)
+                const defaultAvatar = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394a3b8'%3E%3Cpath d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 3c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm0 14.2c-2.5 0-4.71-1.28-6-3.22.03-1.99 4-3.08 6-3.08 1.99 0 5.97 1.09 6 3.08-1.29 1.94-3.5 3.22-6 3.22z'/%3E%3C/svg%3E";
+                const avatarSrc = avatarUrl || defaultAvatar;
+
+                item.innerHTML = `
+                    <div style="display:flex; align-items:center;">
+                        <span class="rank">-</span>
+                        <img src="${avatarSrc}" class="avatar" alt="avatar" onerror="this.src='${defaultAvatar}'">
+                        <div class="user-info">
+                            <span class="nickname">${nickname}</span>
+                            <span class="user-id">ID: ${user_id}</span>
+                        </div>
+                    </div>
+                    <div class="tap-count">0</div>
+                `;
+                leaderboard.appendChild(item);
+            }
+
+            // Update Avatar if changed (and not default)
+            if (avatarUrl) {
+                const img = item.querySelector('.avatar');
+                if (img.src !== avatarUrl) img.src = avatarUrl;
+            }
+
+            const countEl = item.querySelector('.tap-count');
+            countEl.innerText = count.toLocaleString();
+
+            // Animation
+            countEl.classList.remove('animation-pop');
+            void countEl.offsetWidth;
+            countEl.classList.add('animation-pop');
+        }
 
         function sortLeaderboard() {
             const items = Array.from(leaderboard.children);
@@ -340,6 +498,19 @@
                 return countB - countA;
             });
             items.forEach(item => leaderboard.appendChild(item));
+        }
+
+        function updateRanks() {
+            const items = Array.from(leaderboard.querySelectorAll('.leaderboard-item'));
+            items.forEach((item, index) => {
+                const rankEl = item.querySelector('.rank');
+                const rank = index + 1;
+                rankEl.innerText = `#${rank}`;
+
+                // Cleanup old classes
+                rankEl.classList.remove('rank-1', 'rank-2', 'rank-3');
+                if (rank <= 3) rankEl.classList.add(`rank-${rank}`);
+            });
         }
     </script>
 </body>

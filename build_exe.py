@@ -10,8 +10,8 @@ def build():
     PyInstaller.__main__.run([
         "app.py",
         "--name=TikTokTapCounter",
+        "--windowed", # Hide console window
         "--onefile",
-        # "--noconsole", # Keep console for debugging for now, user requested ease of use but also transparency helps
         "--add-data=templates;templates",
         "--clean",
     ])

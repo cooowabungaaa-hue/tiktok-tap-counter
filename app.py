@@ -2,13 +2,17 @@ import asyncio
 import socketio
 import httpx
 from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from TikTokLive import TikTokLiveClient
 from TikTokLive.events import LikeEvent, ConnectEvent, DisconnectEvent, CommentEvent
 import uvicorn
 import os
+import csv
+import io
 import logging
+from datetime import datetime
 
 # Configure logging
 logging.basicConfig(
@@ -20,7 +24,7 @@ logging.basicConfig(
     ]
 )
 
-VERSION = "1.0.1"
+VERSION = "1.0.3"
 UPDATE_URL = "https://your-github-username.github.io/your-repo-name/version.json" # Placeholder
 
 app = FastAPI()
@@ -97,7 +101,15 @@ class TikTokManager:
                 logging.info(f"LikeEvent detected! {nickname} (@{uid}) +{like_count}")
                 
                 if uid not in self.user_taps:
-                    self.user_taps[uid] = {'nickname': nickname, 'count': 0}
+                    self.user_taps[uid] = {
+                        'nickname': nickname, 
+                        'count': 0,
+                        'avatar': event.user.avatar.urls[0] if event.user.avatar and event.user.avatar.urls else None
+                    }
+                else:
+                    # Update avatar if available (might change)
+                    if event.user.avatar and event.user.avatar.urls:
+                         self.user_taps[uid]['avatar'] = event.user.avatar.urls[0]
                 
                 self.user_taps[uid]['count'] += like_count
                 
@@ -105,6 +117,7 @@ class TikTokManager:
                 await sio.emit('tap_update', {
                     'user_id': uid,
                     'nickname': nickname,
+                    'avatar': self.user_taps[uid]['avatar'],
                     'add_count': like_count,
                     'total_count': self.user_taps[uid]['count']
                 })
@@ -142,11 +155,68 @@ class TikTokManager:
             self.is_connected = False
             await sio.emit('status', {'connected': False})
 
+    def get_csv_data(self):
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(['User ID', 'Nickname', 'Total Likes', 'Avatar URL'])
+        
+        # Sort by count descending
+        sorted_users = sorted(self.user_taps.values(), key=lambda x: x['count'], reverse=True)
+        
+        for user in sorted_users:
+            writer.writerow([
+                # We need to find the ID for this user object (a bit inefficient but works for now)
+                # Actually, better to store ID in the object too? 
+                # Let's iterate items() instead.
+                # Wait, sorted_users is a list of dicts. 
+                # Let's do this cleaner:
+                '', # Placeholder for ID if not easily accessible in values, but we need it.
+                user['nickname'],
+                user['count'],
+                user.get('avatar', '')
+            ])
+        return output.getvalue()
+        
+    def get_csv_data_with_ids(self):
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(['Rank', 'User ID', 'Nickname', 'Total Likes', 'Avatar URL'])
+        
+        # Create list of (id, data) tuples
+        items = list(self.user_taps.items())
+        # Sort by count desc
+        items.sort(key=lambda x: x[1]['count'], reverse=True)
+        
+        for i, (uid, data) in enumerate(items, 1):
+             writer.writerow([
+                 i,
+                 uid,
+                 data['nickname'],
+                 data['count'],
+                 data.get('avatar', '')
+             ])
+        return output.getvalue()
+
 manager = TikTokManager()
+
+@app.get("/export_csv")
+async def export_csv():
+    csv_content = manager.get_csv_data_with_ids()
+    filename = f"tiktok_taps_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    return Response(
+        content=csv_content,
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request, "version": VERSION})
+
+@app.post("/shutdown")
+async def shutdown():
+    print("Shutdown requested from frontend. Exiting...")
+    os._exit(0)
 
 @sio.on('connect')
 async def handle_connect_socket(sid, environ):
@@ -154,6 +224,13 @@ async def handle_connect_socket(sid, environ):
         await sio.emit('update_available', {'version': manager.update_available}, to=sid)
     if manager.is_connected:
         await sio.emit('status', {'connected': True, 'streamer': manager.current_streamer}, to=sid)
+    
+    # Rehydration: Send full current data
+    if manager.user_taps:
+        # Send as a list for easier frontend handling? Or just dict.
+        # Let's send dict for now, or maybe the list for the leaderboard directly.
+        # Sending the raw dictionary allows frontend to rebuild whatever it needs.
+        await sio.emit('initial_data', manager.user_taps, to=sid)
 
 @app.on_event("startup")
 async def startup_event():
@@ -169,6 +246,7 @@ async def handle_connect(sid, data):
 @sio.on('disconnect_streamer')
 async def handle_disconnect(sid):
     print("Web request to disconnect")
+    manager.user_taps = {} # Clear session data
     await manager.stop()
 
 @sio.on('confirm_update')
