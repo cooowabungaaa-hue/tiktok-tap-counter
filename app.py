@@ -20,7 +20,7 @@ logging.basicConfig(
     ]
 )
 
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 UPDATE_URL = "https://your-github-username.github.io/your-repo-name/version.json" # Placeholder
 
 app = FastAPI()
